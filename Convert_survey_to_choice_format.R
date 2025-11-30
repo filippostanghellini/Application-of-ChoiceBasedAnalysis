@@ -157,8 +157,8 @@ convert_survey_to_choice_format <- function(input_file, output_file) {
 # input_file da sovrascrivere con il file scaricato dal google form
 # output_file è il file di destinazione (viene sovrascrtitto ogni volta)
 choice_data <- convert_survey_to_choice_format(
-  input_file = "Questionario Lab (Risposte) - Risposte del modulo 1.csv", 
-  output_file = "Choice_Data_Converted.csv"
+  input_file = "raw_data/Questionario Lab (Risposte) - Risposte del modulo 1.csv", 
+  output_file = "data/Choice_Data_Converted.csv"
 )
 
 # Visualizza le prime righe

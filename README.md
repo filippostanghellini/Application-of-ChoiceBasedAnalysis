@@ -14,10 +14,17 @@ Il progetto utilizza la metodologia Choice-Based Conjoint Analysis per analizzar
 
 ## Struttura del Repository
 
+### Script R
 - `Design_Project.R`: Script per la generazione del design sperimentale ottimale
 - `Convert_survey_to_choice_format.R`: Script per convertire i dati dal Google Form al formato per l'analisi
-- `Questionario Lab (Risposte) - Risposte del modulo 1.csv`: Risposte raccolte dal Google Form (input file)
-- `Choice_Data_Converted.csv`: File delle risposte convertite per eseguire l'analisi (output file)
+- `Extract_info_per_respondent.R`: Script per estrarre le informazioni demografiche dei rispondenti
+
+### Dati
+- `raw_data/`: Cartella contenente i dati grezzi
+  - `Questionario Lab (Risposte) - Risposte del modulo 1.csv`: Risposte raccolte dal Google Form
+- `data/`: Cartella contenente i dati elaborati per l'analisi
+  - `Choice_Data_Converted.csv`: File delle risposte convertite per eseguire l'analisi
+  - `demographic_information.csv`: Informazioni demografiche dei rispondenti (età, genere, titolo di studio)
 
 ## Contributors
 

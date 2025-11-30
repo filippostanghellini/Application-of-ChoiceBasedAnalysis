@@ -3,7 +3,7 @@
 library(tidyverse)
 
 # Read the survey data
-survey_data <- read.csv("Questionario Lab (Risposte) - Risposte del modulo 1.csv", 
+survey_data <- read.csv("raw_data/Questionario Lab (Risposte) - Risposte del modulo 1.csv", 
                         stringsAsFactors = FALSE,
                         fileEncoding = "UTF-8")
 
@@ -37,6 +37,6 @@ print(head(demographic_info, 10))
 
 # Save to CSV file
 write.csv(demographic_info, 
-          "demographic_information.csv", 
+          "data/demographic_information.csv", 
           row.names = FALSE,
           fileEncoding = "UTF-8")
