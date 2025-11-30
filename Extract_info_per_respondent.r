@@ -30,24 +30,9 @@ colnames(demographic_info) <- c(
 )
 
 # Display summary
-cat("=== DEMOGRAPHIC INFORMATION SUMMARY ===\n\n")
-
 cat("Total respondents:", nrow(demographic_info), "\n\n")
 
-cat("Age distribution:\n")
-print(table(demographic_info$Age_Group))
-cat("\n")
-
-cat("Gender distribution:\n")
-print(table(demographic_info$Gender))
-cat("\n")
-
-cat("Education level distribution:\n")
-print(table(demographic_info$Education_Level))
-cat("\n")
-
 # Preview the data
-cat("=== FIRST 10 RESPONDENTS ===\n")
 print(head(demographic_info, 10))
 
 # Save to CSV file
@@ -55,5 +40,3 @@ write.csv(demographic_info,
           "demographic_information.csv", 
           row.names = FALSE,
           fileEncoding = "UTF-8")
-
-cat("\n=== File 'demographic_information.csv' created successfully! ===\n")
