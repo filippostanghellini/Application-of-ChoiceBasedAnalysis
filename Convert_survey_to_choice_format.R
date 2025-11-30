@@ -1,5 +1,4 @@
 # Script per convertire i dati dal Google Form al formato per Choice-Based Conjoint Analysis
-
 library(tidyverse)
 
 # Funzione per convertire i dati del questionario al formato choice-based
@@ -164,3 +163,10 @@ choice_data <- convert_survey_to_choice_format(
 
 # Visualizza le prime righe
 head(choice_data, 30)
+
+# Controllo con barplot dei rispondenti per vedere che non ci siano bug nella conversione 
+barplot(table(choice_data$resp.id), 
+        main = "Frequenza per Respondent", 
+        xlab = "resp.id", 
+        ylab = "Frequenza",
+        las = 2)
