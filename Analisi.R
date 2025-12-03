@@ -1,6 +1,7 @@
 #install.packages("idefix")
 #install.packages("mlogit")
 #install.packages("MASS")
+#install.packages("reshape2")
 
 ################################################################
 ### Analysis of Choice Based Conjoint survey data            ###
@@ -43,7 +44,7 @@ choice_data$cost <- as.factor(choice_data$cost) # convert the variable as qualit
 # 1) Crea l'ID della situazione di scelta (una sola riga extra)
 choice_data$choice_id <- with(choice_data, paste(resp.id, ques, sep = "_"))
 
-# 2) QUI la riga che mi chiedi: chiamata a dfidx
+# 2) dfix per choice_data
 choice_data.mlogit <- dfidx(
   choice_data,
   idx    = list(c("choice_id", "resp.id"), "alt"),
@@ -79,6 +80,7 @@ lrtest(m3, m2)
 
 # Compute the willingness to pay for privacy alta
 #WTP privacy
+#TODO: da capire l'interpretazione è corretta ed eventuali segni nella formula
 coef(m3)["privAlta"]/(coef(m3)["as.numeric(as.character(cost))"])
 
 #WTP codice
@@ -123,13 +125,17 @@ allDesign <- expand.grid(attributes)
 allDesign #all possible design
 
 # we choose a reasonable and realistic subset (where the first row indicates our design), such as
-new.data <- allDesign[c(8, 1, 3, 41, 49, 26), ]
+new.data <- allDesign[c(8, 26, 71, 7, 67, 3), ]
 new.data
+# in questo caso abbiamo simulato la possbile produzione di 3 modelli per il codice,
+# ma vogliamo anche sapere la market share degli altri 3 prodotti
+
 
 # We then pass these designs to predict.mnl() to determine what customers
 # would choose if they had to pick among these six choice_data alternatives:
-predict.mnl(m3, new.data) # using m3 specification
-predict.mnl(m2, new.data) # using m2 specification
+predict.mnl(m3, new.data) # using m3 specification, price numerica
+#TODO: da capire bene 
+predict.mnl(m2, new.data) # using m2 specification, price categoriale 
 
 # Compute and plot preference share sensitivity
 # Producing a sensitivity chart using R is relatively simple: we just need to loop through all
@@ -195,6 +201,8 @@ summary(m2.mixed)
 
 # We can get a visual summary of the distribution of random effects and hence of the level of heterogeneity
 plot(m2.mixed)
+# possiamo capire come trovare nicchie di mercato 
+
 
 # We can extract the distribution of specific random effects using the function rpar()
 specCodice.distr <- rpar(m2.mixed, "specCodice")
@@ -215,9 +223,26 @@ summary(m2.mixed2)
 # and then convert it to a correlation matrix using "cov2cor" from base R.
 cov2cor(cov.mlogit(m2.mixed2))
 
+# Calcola la matrice di correlazione
+cor_mat <- cov2cor(cov.mlogit(m2.mixed2))
+library(ggplot2)
+library(reshape2)
+# Matrice di correlazione
+cor_mat <- cov2cor(cov.mlogit(m2.mixed2))
+# Converti in formato "long"
+cor_long <- melt(cor_mat)
+ggplot(cor_long, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                       midpoint = 0, limit = c(-1, 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "", fill = "Correlazione")
+
 # We can also obtain the standard errors of the correlations among random effects,
 # and hence perform significance test
 summary(vcov(m2.mixed2, what = "rpar", type = "cor"))
+#TODO: da capire meglio
 
 # We may restrict the correlation to only random parameters with significant association
 m2.mixed3 <- update(m2.mixed2, correlation = c("specCodice", "specContent", "qualSufficente"))
@@ -240,6 +265,7 @@ lrtest(m2.mixed3, m2.mixed2) #partially correlated random effects vs. all correl
 # have the preference shares for all of the representative respondents, we average across respondents
 # to get our overall preference share predictions.
 
+#TODO: da capire meglio
 library(MASS)
 predict.mixed.mnl <- function(model, data, nresp=1000) {
   # Function for predicting shares from a mixed MNL model
@@ -265,6 +291,8 @@ predict.mixed.mnl(m2.mixed2, data=new.data)
 
 ################################################################
 ################################################################
+
+#INIZIO ANALISI DEMOGRAFICA
 
 ################################################################
 ################################################################
@@ -337,3 +365,113 @@ summary(choice_data_with_demographics)
 
 ################################################################
 ################################################################
+
+PW.ind <- fitted(m2.mixed2, type = "parameters")
+head(PW.ind)
+
+################################################################
+################################################################
+
+names(PW.ind)[names(PW.ind) == "id"] <- "resp.id"
+PW.ind_with_demographics <- merge(PW.ind, demographic_data, by.x = "resp.id", by.y = "Respondent_ID", all.x = TRUE)
+head(PW.ind_with_demographics)
+
+################################################################
+################################################################TODO: da fare con tutte le variabili
+
+library(lattice)
+histogram(~ velVeloce | Age_Group, data = PW.ind_with_demographics,
+          main = "Histogram of velVeloce Part-Worth by Age Group",
+          xlab = "velVeloce Part-Worth", ylab = "Density")
+
+################################################################
+################################################################
+
+boxplot(velVeloce ~ Age_Group, data = PW.ind_with_demographics,
+        main = "Boxplot of velVeloce Part-Worth by Age Group",
+        xlab = "Age Group", ylab = "velVeloce Part-Worth")
+
+# After visualizing the distributions, the next step is to calculate the mean 'velVeloce' part-worth for each 'Age_Group' category. 
+# This will provide a quantitative summary of the central tendency of preferences within each age group.
+by(PW.ind_with_demographics$velVeloce, PW.ind_with_demographics$Age_Group, mean)
+
+################################################################
+################################################################
+
+# Perform statistical tests to assess the impact of 'Age_Group' on 'velVeloce' preferences. 
+# Since 'Age_Group' has multiple categories, an ANOVA (Analysis of Variance) test is appropriate to determine if there are significant differences in the mean 'velVeloce' part-worth across the age groups.
+anova_result <- aov(velVeloce ~ Age_Group, data = PW.ind_with_demographics)
+summary(anova_result)
+
+################################################################
+################################################################
+
+histogram(~ velVeloce | Gender, data = PW.ind_with_demographics,
+          main = "Histogram of velVeloce Part-Worth by Gender",
+          xlab = "velVeloce Part-Worth", ylab = "Density")
+
+################################################################
+################################################################
+
+boxplot(velVeloce ~ Gender, data = PW.ind_with_demographics,
+        main = "Boxplot of velVeloce Part-Worth by Gender",
+        xlab = "Gender", ylab = "velVeloce Part-Worth")
+
+################################################################
+################################################################
+
+by(PW.ind_with_demographics$velVeloce, PW.ind_with_demographics$Gender, mean)
+
+################################################################
+################################################################
+
+anova_gender_result <- aov(velVeloce ~ Gender, data = PW.ind_with_demographics)
+summary(anova_gender_result)
+
+################################################################
+################################################################
+
+# Define the variables of interest with default values
+part_worth_variable <- "velVeloce"
+demographic_variable <- "Age_Group"
+
+# Ensure the necessary library for plotting is loaded
+library(lattice)
+
+# 1. Generate a histogram of part_worth_variable by demographic_variable
+histogram(as.formula(paste("~ ", part_worth_variable, " | ", demographic_variable)),
+          data = PW.ind_with_demographics,
+          main = paste("Histogram of", part_worth_variable, "by", demographic_variable),
+          xlab = paste(part_worth_variable, "Part-Worth"), ylab = "Density")
+
+# 2. Generate a boxplot of part_worth_variable by demographic_variable
+boxplot(as.formula(paste(part_worth_variable, "~ ", demographic_variable)),
+        data = PW.ind_with_demographics,
+        main = paste("Boxplot of", part_worth_variable, "by", demographic_variable),
+        xlab = demographic_variable, ylab = paste(part_worth_variable, "Part-Worth"))
+
+# 3. Calculate the mean part_worth_variable for each category of demographic_variable
+cat(paste("\nMean", part_worth_variable, "by", demographic_variable, ":\n"))
+print(by(PW.ind_with_demographics[[part_worth_variable]],
+         PW.ind_with_demographics[[demographic_variable]],
+         mean))
+
+# 4. Perform an appropriate statistical test
+num_categories <- length(unique(PW.ind_with_demographics[[demographic_variable]]))
+
+if (num_categories > 2) {
+  # Perform ANOVA test if more than two unique categories
+  cat(paste("\nPerforming ANOVA test for", part_worth_variable, "by", demographic_variable, ":\n"))
+  anova_result <- aov(as.formula(paste(part_worth_variable, "~ ", demographic_variable)),
+                      data = PW.ind_with_demographics)
+  print(summary(anova_result))
+} else if (num_categories == 2) {
+  # Perform t-test if exactly two unique categories
+  cat(paste("\nPerforming t-test for", part_worth_variable, "by", demographic_variable, ":\n"))
+  t_test_result <- t.test(as.formula(paste(part_worth_variable, "~ ", demographic_variable)),
+                          data = PW.ind_with_demographics)
+  print(t_test_result)
+} else {
+  cat("\nNot enough categories in the demographic variable to perform a statistical test.\n")
+}
+
