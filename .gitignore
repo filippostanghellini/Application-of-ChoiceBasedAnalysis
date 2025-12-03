@@ -1,3 +1,10 @@
+# Pycharm IDE
 .idea
+
+# Mac Enviroment
 .DS_Store
 
+# R enviroment
+.Rproj.user
+.Rhistory
+Application-of-ChoiceBasedAnalysis.Rproj
