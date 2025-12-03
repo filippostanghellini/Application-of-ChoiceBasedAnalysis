@@ -3,11 +3,8 @@
 
 # Mac Enviroment
 .DS_Store
-<<<<<<< Updated upstream
 
 # R enviroment
 .Rproj.user
 .Rhistory
 Application-of-ChoiceBasedAnalysis.Rproj
-=======
->>>>>>> Stashed changes
