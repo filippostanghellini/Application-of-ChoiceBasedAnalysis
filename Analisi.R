@@ -266,30 +266,6 @@ predict.mixed.mnl(m2.mixed2, data=new.data)
 ################################################################
 ################################################################
 
-<<<<<<< Updated upstream
-#TODO: controlla questa parte
-### Assessing the effects of individual-level predictors
-# To assess if consumer heterogeneity can be explained by their individual characteristics
-# we can study the relationship between the individual part worth and the individual-level variables.
-# Individual part worth can be extracted using fitted(), with the "type" argument set to "parameters".
-PW.ind <- fitted(m2.mixed2, type = "parameters")
-head(PW.ind)
-
-# We can use merge() to include the individual-level variable "carpool"
-carpool.data <- unique(minivan[,c(1,4)])
-names(PW.ind)[1] <- "resp.id"
-PW.ind <- merge(PW.ind, carpool.data, by="resp.id")
-
-# Let's focus on the seat8 random effect
-library(lattice)
-histogram(~ seat8 | carpool, data=PW.ind)
-boxplot(seat8 ~ carpool, data=PW.ind)
-by(PW.ind$seat8, PW.ind$carpool, mean)
-t.test(seat8 ~ carpool, data=PW.ind) # heterogeneity about preference for 8-seats is at least partially
-                                     # significantly explained by carpool
-
-=======
->>>>>>> Stashed changes
 ################################################################
 ################################################################
 
