@@ -6,25 +6,43 @@ Questo repository contiene l'implementazione di un'analisi Choice-Based Conjoint
 
 Il progetto utilizza la metodologia Choice-Based Conjoint Analysis per analizzare le preferenze degli utenti su cinque attributi principali di un assistente AI:
 
-- **Specializzazione**: Assistente, Codice, Content
-- **Velocità**: Lento, Veloce  
-- **Qualità**: Sufficiente, Ottimale
-- **Privacy**: Bassa, Alta
-- **Costo**: 15€, 20€, 25€
+| Attributo | Livelli |
+|-----------|---------|
+| **Specializzazione** | Assistente, Codice, Content |
+| **Velocità** | Lento, Veloce |
+| **Qualità** | Sufficiente, Ottimale |
+| **Privacy** | Bassa, Alta |
+| **Costo** | 15€, 20€, 25€ |
 
 ## Struttura del Repository
 
+```
+├── Analisi.R                           # Script principale per l'analisi
+├── Design_Project.R                    # Generazione del design sperimentale
+├── Convert_survey_to_choice_format.R   # Conversione dati Google Form
+├── Extract_info_per_respondent.R       # Estrazione info demografiche
+├── data/
+│   ├── Choice_Data_Converted.csv       # Dati convertiti per l'analisi
+│   └── demographic_information.csv     # Info demografiche rispondenti
+└── raw_data/
+    └── Questionario Lab (Risposte).csv # Risposte grezze dal Google Form
+```
+
 ### Script R
-- `Design_Project.R`: Script per la generazione del design sperimentale ottimale
-- `Convert_survey_to_choice_format.R`: Script per convertire i dati dal Google Form al formato per l'analisi
-- `Extract_info_per_respondent.R`: Script per estrarre le informazioni demografiche dei rispondenti
+
+| Script | Descrizione |
+|--------|-------------|
+| `Analisi.R` | Script principale per l'analisi dei dati con modelli Multinomial Logit e Mixed Multinomial Logit |
+| `Design_Project.R` | Generazione del design sperimentale ottimale |
+| `Convert_survey_to_choice_format.R` | Conversione dei dati dal Google Form al formato per l'analisi |
+| `Extract_info_per_respondent.R` | Estrazione delle informazioni demografiche dei rispondenti |
 
 ### Dati
-- `raw_data/`: Cartella contenente i dati grezzi
-  - `Questionario Lab (Risposte) - Risposte del modulo 1.csv`: Risposte raccolte dal Google Form
-- `data/`: Cartella contenente i dati elaborati per l'analisi
-  - `Choice_Data_Converted.csv`: File delle risposte convertite per eseguire l'analisi
-  - `demographic_information.csv`: Informazioni demografiche dei rispondenti (età, genere, titolo di studio)
+
+- **`raw_data/`**: Dati grezzi raccolti dal Google Form
+- **`data/`**: Dati elaborati pronti per l'analisi
+  - `Choice_Data_Converted.csv`: Risposte convertite nel formato richiesto per la Conjoint Analysis
+  - `demographic_information.csv`: Informazioni demografiche (età, genere, titolo di studio)
 
 ## Contributors
 
