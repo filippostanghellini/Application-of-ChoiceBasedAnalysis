@@ -28,7 +28,7 @@ xtabs(choice ~ cost, data=choice_data)
 # recode some variables
 choice_data$spec <- factor(choice_data$spec, levels=c("Assistente","Codice","Content")) # change order of categories
 choice_data$vel <- factor(choice_data$vel, levels=c("Lento","Veloce")) # change order of categories
-choice_data$qual <- factor(choice_data$qual, levels=c("Ottimale","Sufficente")) # change order of categories
+choice_data$qual <- factor(choice_data$qual, levels=c("Sufficente","Ottimale")) # change order of categories
 choice_data$priv <- factor(choice_data$priv, levels=c("Bassa","Alta")) # change order of categories
 choice_data$cost <- as.factor(choice_data$cost) # convert the variable as qualitative
 
@@ -93,7 +93,7 @@ coef(m3)["specContent"]/(coef(m3)["as.numeric(as.character(cost))"])
 coef(m3)["velVeloce"]/(coef(m3)["as.numeric(as.character(cost))"])
 
 #WTP quality
-coef(m3)["qualSufficente"]/(coef(m3)["as.numeric(as.character(cost))"])
+coef(m3)["qualOttimale"]/(coef(m3)["as.numeric(as.character(cost))"])
 
 # Simulate preference shares using the "predict.mnl" function
 # Define the function
@@ -125,7 +125,7 @@ allDesign <- expand.grid(attributes)
 allDesign #all possible design
 
 # we choose a reasonable and realistic subset (where the first row indicates our design), such as
-new.data <- allDesign[c(8, 26, 71, 7, 67, 3), ]
+new.data <- allDesign[c(8, 26, 71, 7, 67, 3), ] #TODO:da riselezionare prodotti più coerenti
 new.data
 # in questo caso abbiamo simulato la possbile produzione di 3 modelli per il codice,
 # ma vogliamo anche sapere la market share degli altri 3 prodotti
@@ -203,7 +203,6 @@ summary(m2.mixed)
 plot(m2.mixed)
 # possiamo capire come trovare nicchie di mercato 
 
-
 # We can extract the distribution of specific random effects using the function rpar()
 specCodice.distr <- rpar(m2.mixed, "specCodice")
 summary(specCodice.distr)
@@ -245,7 +244,7 @@ summary(vcov(m2.mixed2, what = "rpar", type = "cor"))
 #TODO: da capire meglio
 
 # We may restrict the correlation to only random parameters with significant association
-m2.mixed3 <- update(m2.mixed2, correlation = c("specCodice", "specContent", "qualSufficente"))
+m2.mixed3 <- update(m2.mixed2, correlation = c("specCodice", "specContent", "qualOttimale"))
 
 # The significant presence of random coefficients and their correlation
 # can be further investigated using the ML tests, such as the ML ratio test
