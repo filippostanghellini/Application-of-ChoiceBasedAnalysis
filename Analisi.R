@@ -2,6 +2,7 @@
 #install.packages("mlogit")
 #install.packages("MASS")
 #install.packages("reshape2")
+#install.packages("car")
 
 ################################################################
 ### Analysis of Choice Based Conjoint survey data            ###
@@ -94,6 +95,41 @@ coef(m3)["velVeloce"]/(coef(m3)["as.numeric(as.character(cost))"])
 
 #WTP quality
 coef(m3)["qualOttimale"]/(coef(m3)["as.numeric(as.character(cost))"])
+
+################################################################
+################################################################
+
+#TODO: controlla se può avere senso usare delta method
+# usiamo delta method per la WTP 
+# Il Delta Method è una tecnica statistica per calcolare la varianza 
+# (e quindi gli standard error e intervalli di confidenza) di una funzione 
+# di parametri stimati, quando conosci già la varianza dei parametri originali.
+
+# Calcola WTP con CI per TUTTI gli attributi
+library(car)
+
+attributes <- c("specCodice", "specContent", "velVeloce", "qualOttimale", "privAlta")
+
+wtp_table <- data.frame()
+
+for(attr in attributes) {
+  formula_str <- paste0("-", attr, " / `as.numeric(as.character(cost))`")
+  dm <- deltaMethod(m3, formula_str)
+  
+  wtp_table <- rbind(wtp_table, data.frame(
+    Attributo = attr,
+    WTP = round(dm$Estimate, 2),
+    SE = round(dm$SE, 2),
+    CI_Lower = round(dm$`2.5 %`, 2),
+    CI_Upper = round(dm$`97.5 %`, 2)
+  ))
+}
+
+print(wtp_table)
+
+
+################################################################
+################################################################
 
 # Simulate preference shares using the "predict.mnl" function
 # Define the function
