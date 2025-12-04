@@ -286,7 +286,7 @@ ggplot(cor_long, aes(Var1, Var2, fill = value)) +
 summary(vcov(m2.mixed2, what = "rpar", type = "cor"))
 
 # We may restrict the correlation to only random parameters with significant association
-m2.mixed3 <- update(m2.mixed2, correlation = c("specCodice", "specContent", "privAlta", "velVeloce", "cost20", "cost25"))
+m2.mixed3 <- update(m2.mixed2, correlation = c("specCodice", "qualOttimale", "specContent", "privAlta", "velVeloce", "cost20", "cost25"))
 
 # The significant presence of random coefficients and their correlation
 # can be further investigated using the ML tests, such as the ML ratio test
