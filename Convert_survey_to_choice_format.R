@@ -7,6 +7,19 @@ convert_survey_to_choice_format <- function(input_file, output_file) {
   # Leggi il file CSV del questionario
   survey_data <- read.csv(input_file, sep = ",", header = TRUE, check.names = FALSE)
   
+  # Rimuovi le righe dove la risposta alla SCELTA 5 è "Codice - Lento - Sufficiente - Alta - 25€"
+  # La colonna SCELTA 5 è la nona colonna (indice 9)
+  choice5_col <- "Specializzazione | Velocità | Qualità | Privacy | Costo  (SCELTA 5)"
+  invalid_response <- "Codice - Lento - Sufficiente - Alta - 25€"
+  
+  rows_before <- nrow(survey_data)
+  survey_data <- survey_data[survey_data[[choice5_col]] != invalid_response, ]
+  rows_removed <- rows_before - nrow(survey_data)
+  
+  if (rows_removed > 0) {
+    cat("Rimosse", rows_removed, "righe con risposta non valida alla SCELTA 5\n")
+  }
+  
   # Numero di choice set (colonne con le scelte - escludi le prime 4 colonne demografiche)
   choice_columns <- 5:ncol(survey_data)
   n_sets <- length(choice_columns)

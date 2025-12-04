@@ -7,6 +7,20 @@ survey_data <- read.csv("raw_data/Questionario Lab (Risposte) - Risposte del mod
                         stringsAsFactors = FALSE,
                         fileEncoding = "UTF-8")
 
+# Rimuovi le righe dove la risposta alla SCELTA 5 è "Codice - Lento - Sufficiente - Alta - 25€"
+choice5_col <- "Specializzazione...Velocità...Qualità...Privacy...Costo...SCELTA.5."
+invalid_response <- "Codice - Lento - Sufficiente - Alta - 25€"
+
+# Usa grepl per un matching più robusto
+rows_to_keep <- !grepl(invalid_response, survey_data[[choice5_col]], fixed = TRUE)
+rows_before <- nrow(survey_data)
+survey_data <- survey_data[rows_to_keep, ]
+rows_removed <- rows_before - nrow(survey_data)
+
+if (rows_removed > 0) {
+  cat("Rimosse", rows_removed, "righe con risposta non valida alla SCELTA 5\n")
+}
+
 # Extract demographic columns
 demographic_info <- survey_data %>%
   select(
@@ -40,3 +54,4 @@ write.csv(demographic_info,
           "data/demographic_information.csv", 
           row.names = FALSE,
           fileEncoding = "UTF-8")
+
