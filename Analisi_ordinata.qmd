@@ -1,0 +1,131 @@
+---
+title: "Application of ChoiceBasedAnalysis"
+format: html
+editor: visual
+---
+
+# Application of ChoiceBasedAnalysis
+
+## Designing of the Survey
+
+We design the Survey with 5 attribute and 2-3 levels. The number of combination from this setting would be 3×2×2×2×3=72 that for a form would be impossible. So to select the best option we use an optimal design. The latter allow us to choose the most informative profiles to show to respondents so that each response provides as much information as possible about the model parameters.
+
+| Attribute | Level                       |
+|-----------|-----------------------------|
+| spec      | Assistente, Codice, Content |
+| vel       | Lento, Veloce               |
+| qual      | Sufficiente, Ottimale       |
+| priv      | Bassa, Alta                 |
+| cost      | 15, 20, 25                  |
+
+In the optimal design setting we choose the optimal criterion to select the possible choice.
+
+To perform we:
+
+-   Select the informative priors manually selecting the Expected Draws
+
+-   Creation of the candidate set
+
+-   Creation of the optimal survey
+
+### Manually select the Expected Draws by (as expert):
+
+-   Decide a baseline for each attribute – choose a reference level that represents a neutral or typical scenario.
+
+-   Decide the attractiveness of each level relative to the baseline:
+
+    -   Assign a positive value if the level is more attractive than the baseline.
+
+    -   Assign a **negative value** if the level is less attractive than the baseline.
+
+-   **Decide the magnitude** of each value to reflect **how much better or worse** the level is compared to the baseline.
+
+This create this table
+
+|  |  |  |  |  |  |  |
+|----|----|----|----|----|----|----|
+| **β1​ (Codice)** | **β2​ (Cont.)** | **β3​ (Veloce 5s)** | **β4​ (Ottim.)** | **β5​ (Sì/Privacy)** | **β6​ (Costo 20)** | **β7​ (Costo 25)** |
+| -1 | -1.5 | +0.5 | +2 | +2 | -1 | -2 |
+| -0.5 | -1.2 | +1.5 | +1.2 | +1.5 | -1 | -1.8 |
+| -0.4 | -0.8 | +0.8 | +1 | +0.4 | -1.5 | -1.8 |
+| +0.4 | -1.5 | +0.8 | +1.5 | +1.5 | -0.9 | -1.5 |
+| +0.3 | -0.3 | +0.7 | +0.5 | +1.5 | -0.5 | -1 |
+
+That coded in r would be:
+
+```{r}
+exp_draws <- matrix(c(
+  -1.0, -1.5, 0.5, 2.0, 2.0, -1.0, -2.0,
+  -0.5, -1.2, 1.5, 1.2, 1.5, -1.0, -1.8,
+  -0.4, -0.8, 0.8, 1.0, 0.4, -1.2, -1.9,
+  +0.4, -1.5, 0.8, 1.5, 1.5, -0.9, -1.5,
+  +0.3, -0.3, 0.7, 0.5, 1.5, -0.5, -1.0
+  ), ncol=7, byrow=T)
+
+```
+
+Define the prior parameter and the covariance matrix of the prior
+
+```{r}
+# Define the prior parameter
+mu <- apply(exp_draws, 2, mean)  #mean of the coefficent
+var(exp_draws)
+cor(exp_draws)
+
+# Covariance matrix of the prior
+sigma <- diag(7)
+sigma[7,6] <- sigma[6,7] <- 0.5
+
+
+```
+
+Then we generate individual values of parameters according to the previously specified distributions, using the multivariate normal distribution.
+
+```{r}
+library(MASS)
+set.seed(8756)
+draws <- mvrnorm(n=20, mu=mu, Sigma=sigma) # generate value for 20 individuals
+```
+
+These draws represent the people that would participate to the survey
+
+### Creation of the candidate set 
+
+Create of the candidate set as the all the possible profiles you could show to respondents. Every profile has the all possible combination of level and attributes
+
+```{r}
+library(idefix)
+# Firstly, we need to create the full design that considers all possible profiles
+# using the function Profiles()
+
+attrib <- c(3, 2, 2, 2, 3) # specify 4 attributes with respectively 3, 3, 2 and 2 levels. 
+dcode <- rep("D", length=5) # specify to treat attributes as dummy variables
+prof.set <- Profiles(lvls=attrib, coding=dcode) # create the set of all possible profiles
+
+```
+
+### Creation of the optimal survey
+
+We generate a D-optimal design consisting of the best 10 choice sets, selected from the most informative profiles. The algorithm chooses the profiles that maximize the determinant of the Fisher Information Matrix, taking into account the simulated priors.
+
+```{r}
+optDes <- Modfed(cand.set=prof.set, n.sets=10, n.alts=3, par.draws=draws)
+```
+
+Decode the survey in a format we can read
+
+```{r}
+# Using the function Decode(), we can convert the choice set design from 
+# a model matrix structure to a data frame format 
+attrib <- list(spec = c("Assistente", "Codice", "Content"), #list of attributes with levels 
+               vel = c("Lento", "Veloce"),
+               qual = c("Sufficente", "Ottimale"),
+               priv = c("Bassa", "Alta"),
+               cost = c("15", "20", "25")) 
+
+
+optDesDF <- Decode(des=optDes$BestDesign$design, n.alts=3, lvl.names=attrib, coding=dcode)$design 
+names(optDesDF) <- c("spec", "vel", "qual", "priv", "cost")
+optDesDF
+
+```
