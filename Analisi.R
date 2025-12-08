@@ -20,11 +20,31 @@ head(choice_data)
 
 # see some descriptive statistics
 summary(choice_data)
-xtabs(choice ~ spec, data=choice_data)
-xtabs(choice ~ vel, data=choice_data)
-xtabs(choice ~ qual, data=choice_data)
-xtabs(choice ~ priv, data=choice_data)
-xtabs(choice ~ cost, data=choice_data)
+
+# Compute frequency tables
+tab_spec <- xtabs(choice ~ spec, data = choice_data)
+tab_vel  <- xtabs(choice ~ vel,  data = choice_data)
+tab_qual <- xtabs(choice ~ qual, data = choice_data)
+tab_priv <- xtabs(choice ~ priv, data = choice_data)
+tab_cost <- xtabs(choice ~ cost, data = choice_data)
+
+# Set layout: 3 plots on the first row, 2 on the second
+par(mfrow = c(2, 3), mar = c(4, 4, 3, 1))
+
+# Define a single coherent blue palette
+blue_palette <- c("#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#3182bd")
+
+# Draw barplots (same palette used in each subplot)
+barplot(tab_spec, main = "Choice by Specification",
+        col = blue_palette, border = NA)
+barplot(tab_vel,  main = "Choice by Speed",
+        col = blue_palette, border = NA)
+barplot(tab_qual, main = "Choice by Quality",
+        col = blue_palette, border = NA)
+barplot(tab_priv, main = "Choice by Privacy",
+        col = blue_palette, border = NA)
+barplot(tab_cost, main = "Choice by Cost",
+        col = blue_palette, border = NA)
 
 # recode some variables
 choice_data$spec <- factor(choice_data$spec, levels=c("Assistente","Codice","Content")) # change order of categories
@@ -77,10 +97,48 @@ lrtest(m3, m2)
 
 # We use model m3
 
-# Compute the willingness to pay for privacy alta
-#WTP privacy
--coef(m3)["privAlta"]/(coef(m3)["as.numeric(as.character(cost))"])
+library(gridExtra)
+library(ggplot2)
 
+# Extract coefficient table from m3
+summ_m3  <- summary(m3)
+coef_mat <- as.data.frame(summ_m3$CoefTable,
+                          stringsAsFactors = FALSE)
+
+# Add attribute names as first column
+coef_tab <- data.frame(
+  Attribute = rownames(coef_mat),
+  coef_mat,
+  row.names       = NULL,
+  check.names     = FALSE,
+  stringsAsFactors = FALSE
+)
+
+# Make sure p-values are numeric
+pvals <- as.numeric(coef_tab[["Pr(>|z|)"]])
+
+# Significance stars
+coef_tab$Signif <- cut(
+  pvals,
+  breaks = c(-Inf, 0.01, 0.05, 0.10, Inf),
+  labels = c("***", "**", "*", "")
+)
+
+# Rounding
+coef_tab$Estimate      <- round(as.numeric(coef_tab$Estimate), 3)
+coef_tab$`Std. Error`  <- round(as.numeric(coef_tab$`Std. Error`), 3)
+coef_tab$`z-value`     <- round(as.numeric(coef_tab$`z-value`), 3)
+coef_tab$`Pr(>|z|)`    <- signif(pvals, 3)
+
+# Column names
+colnames(coef_tab) <- c("Attribute", "Estimate", "Std. Error", "z value", "Pr(>|z|)", "Signif.")
+
+# Table as graphic
+table_plot <- tableGrob(coef_tab)
+grid.arrange(table_plot)
+
+
+##### Compute the willingness to pay
 #WTP codice
 -coef(m3)["specCodice"]/(coef(m3)["as.numeric(as.character(cost))"])
 
@@ -93,6 +151,9 @@ lrtest(m3, m2)
 #WTP quality
 -coef(m3)["qualOttimale"]/(coef(m3)["as.numeric(as.character(cost))"])
 
+#WTP privacy
+-coef(m3)["privAlta"]/(coef(m3)["as.numeric(as.character(cost))"])
+
 ################################################################
 ################################################################
 
@@ -104,20 +165,21 @@ attributes <- c("specCodice", "specContent", "velVeloce", "qualOttimale", "privA
 
 wtp_table <- data.frame()
 
-for(attr in attributes) {
+for (attr in attributes) {
   formula_str <- paste0("-", attr, " / `as.numeric(as.character(cost))`")
   dm <- deltaMethod(m3, formula_str)
   
   wtp_table <- rbind(wtp_table, data.frame(
-    Attributo = attr,
-    WTP = round(dm$Estimate, 2),
-    SE = round(dm$SE, 2),
+    Attribute = attr,
+    WTP      = round(dm$Estimate, 2),
+    SE       = round(dm$SE, 2),
     CI_Lower = round(dm$`2.5 %`, 2),
     CI_Upper = round(dm$`97.5 %`, 2)
   ))
 }
 
-print(wtp_table)
+wtp_plot <- tableGrob(wtp_table)
+grid.arrange(wtp_plot)
 
 ################################################################
 ################################################################
@@ -157,7 +219,17 @@ new.data
 
 # We then pass these designs to predict.mnl() to determine what customers
 # would choose if they had to pick among these six choice_data alternatives:
-predict.mnl(m3, new.data) # using m3 specification, price numerica
+predict.mnl(m3, new.data) # using m3 specification
+
+# Plot
+pred <- predict.mnl(m3, new.data)
+pred_table <- as.data.frame(pred, row.names = NULL)
+pred_table$share <- round(pred_table$share, 4)
+pred_plot <- tableGrob(pred_table)
+grid.arrange(pred_plot)
+
+
+
 
 # Compute and plot preference share sensitivity
 # Producing a sensitivity chart using R is relatively simple: we just need to loop through all
@@ -195,6 +267,7 @@ cols <- rep("gray", length(tradeoff$level))
 
 cols[tradeoff$level == "Alta"] <- "red"
 
+par(mfrow=c(1,1))
 barplot(tradeoff$increase,
         horiz = FALSE,
         names.arg = tradeoff$level,
@@ -212,6 +285,13 @@ new.data_new <- allDesign[c(14, 32, 28, 67, 6, 69), ]
 new.data_new
 
 predict.mnl(m3, new.data_new)
+
+#Plot
+pred_new <- predict.mnl(m3, new.data_new)
+pred_table_new <- as.data.frame(pred_new, row.names = NULL)
+pred_table_new$share <- round(pred_table_new$share, 4)
+pred_plot_new <- tableGrob(pred_table_new)
+grid.arrange(pred_plot_new)
 
 ################################################################
 ################################################################
@@ -286,7 +366,7 @@ ggplot(cor_long, aes(Var1, Var2, fill = value)) +
 summary(vcov(m2.mixed2, what = "rpar", type = "cor"))
 
 # We may restrict the correlation to only random parameters with significant association
-m2.mixed3 <- update(m2.mixed2, correlation = c("specCodice", "qualOttimale", "specContent", "privAlta", "velVeloce", "cost20", "cost25"))
+m2.mixed3 <- update(m2.mixed2, correlation = c("cost20", "cost25"))
 
 # The significant presence of random coefficients and their correlation
 # can be further investigated using the ML tests, such as the ML ratio test
@@ -295,6 +375,8 @@ lrtest(m2.mixed, m2.mixed2) #Uncorrelated random effects vs. all correlated rand
 lrtest(m2.mixed3, m2.mixed2) #Partially correlated random effects vs. all correlated random effects
 
 # m2.mixed2 results as the best model
+
+
 
 # Simulating shares
 # To compute share predictions with a mixed MNL model,
@@ -309,12 +391,13 @@ lrtest(m2.mixed3, m2.mixed2) #Partially correlated random effects vs. all correl
 # to get our overall preference share predictions.
 
 library(MASS)
-predict.mixed.mnl <- function(model, data, nresp=1000) {
+predict.mixed.mnl <- function(model, data, nresp=1000, seed = 1111) {
   # Function for predicting shares from a mixed MNL model
   # model: mlogit object returned by mlogit()
   # data: a data frame containing the set of designs for which you want to
   #       predict shares. Same format at the data used to estimate model.
   # Note that this code assumes all model parameters are random
+  set.seed(seed)
   data.model <- model.matrix(update(model$formula, 0 ~ .), data = data)[,-1]
   coef.Sigma <- cov.mlogit(model)
   coef.mu <- model$coef[1:dim(coef.Sigma)[1]]
@@ -328,9 +411,26 @@ predict.mixed.mnl <- function(model, data, nresp=1000) {
   cbind(colMeans(shares), data)
 }
 
-set.seed(1111)
+
 predict.mixed.mnl(m2.mixed2, data=new.data)
 predict.mixed.mnl(m2.mixed2, data=new.data_new) # prediciton with our new product 
+
+#Table Before
+pred_mixed <- predict.mixed.mnl(m2.mixed2, new.data)
+pred_mixed_table <- as.data.frame(pred_mixed, row.names = NULL)
+colnames(pred_mixed_table)[1] <- "share"
+pred_mixed_table$share <- round(pred_mixed_table$share, 4)
+pred_mixed_plot <- tableGrob(pred_mixed_table)
+grid.arrange(pred_mixed_plot)
+
+#Table After
+pred_mixed_new <- predict.mixed.mnl(m2.mixed2, new.data_new)
+pred_mixed_table_new <- as.data.frame(pred_mixed_new, row.names = NULL)
+colnames(pred_mixed_table_new)[1] <- "share"
+pred_mixed_table_new$share <- round(pred_mixed_table_new$share, 4)
+pred_mixed_plot_new <- tableGrob(pred_mixed_table_new)
+grid.arrange(pred_mixed_plot_new)
+
 
 ################################################################
 ################################################################
