@@ -1,0 +1,925 @@
+---
+title: "Application of ChoiceBasedAnalysis"
+format: pdf
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Application of ChoiceBasedAnalysis
+
+## Designing of the Survey
+
+We design the Survey with 5 attribute and 2-3 levels. The number of combination from this setting would be 3×2×2×2×3=72 that for a form would be impossible. So to select the best option we use an optimal design. The latter allow us to choose the most informative profiles to show to respondents so that each response provides as much information as possible about the model parameters.
+
+| Attribute | Level                       |
+|-----------|-----------------------------|
+| spec      | Assistente, Codice, Content |
+| vel       | Lento, Veloce               |
+| qual      | Sufficiente, Ottimale       |
+| priv      | Bassa, Alta                 |
+| cost      | 15, 20, 25                  |
+
+In the optimal design setting we choose the optimal criterion to select the possible choice.
+
+To perform we:
+
+-   Select the informative priors manually selecting the Expected Draws
+
+-   Creation of the candidate set
+
+-   Creation of the optimal survey
+
+### Manually select the Expected Draws by (as expert):
+
+-   Decide a baseline for each attribute – choose a reference level that represents a neutral or typical scenario.
+
+-   Decide the attractiveness of each level relative to the baseline:
+
+    -   Assign a positive value if the level is more attractive than the baseline.
+
+    -   Assign a **negative value** if the level is less attractive than the baseline.
+
+-   **Decide the magnitude** of each value to reflect **how much better or worse** the level is compared to the baseline.
+
+This create this table
+
+|  |  |  |  |  |  |  |
+|----|----|----|----|----|----|----|
+| **β1​ (Codice)** | **β2​ (Cont.)** | **β3​ (Veloce 5s)** | **β4​ (Ottim.)** | **β5​ (Sì/Privacy)** | **β6​ (Costo 20)** | **β7​ (Costo 25)** |
+| -1 | -1.5 | +0.5 | +2 | +2 | -1 | -2 |
+| -0.5 | -1.2 | +1.5 | +1.2 | +1.5 | -1 | -1.8 |
+| -0.4 | -0.8 | +0.8 | +1 | +0.4 | -1.5 | -1.8 |
+| +0.4 | -1.5 | +0.8 | +1.5 | +1.5 | -0.9 | -1.5 |
+| +0.3 | -0.3 | +0.7 | +0.5 | +1.5 | -0.5 | -1 |
+
+That coded in r would be:
+
+```{r}
+exp_draws <- matrix(c(
+  -1.0, -1.5, 0.5, 2.0, 2.0, -1.0, -2.0,
+  -0.5, -1.2, 1.5, 1.2, 1.5, -1.0, -1.8,
+  -0.4, -0.8, 0.8, 1.0, 0.4, -1.2, -1.9,
+  +0.4, -1.5, 0.8, 1.5, 1.5, -0.9, -1.5,
+  +0.3, -0.3, 0.7, 0.5, 1.5, -0.5, -1.0
+  ), ncol=7, byrow=T)
+
+```
+
+Define the prior parameter and the covariance matrix of the prior
+
+```{r}
+# Define the prior parameter
+mu <- apply(exp_draws, 2, mean)  #mean of the coefficent
+var(exp_draws)
+cor(exp_draws)
+
+# Covariance matrix of the prior
+sigma <- diag(7)
+sigma[7,6] <- sigma[6,7] <- 0.5
+
+
+```
+
+Then we generate individual values of parameters according to the previously specified distributions, using the multivariate normal distribution.
+
+```{r}
+library(MASS)
+set.seed(8756)
+draws <- mvrnorm(n=20, mu=mu, Sigma=sigma) # generate value for 20 individuals
+```
+
+These draws represent the people that would participate to the survey
+
+### Creation of the candidate set
+
+Create of the candidate set as the all the possible profiles you could show to respondents. Every profile has the all possible combination of level and attributes
+
+```{r}
+library(idefix)
+# Firstly, we need to create the full design that considers all possible profiles
+# using the function Profiles()
+
+attrib <- c(3, 2, 2, 2, 3) # specify 4 attributes with respectively 3, 3, 2 and 2 levels. 
+dcode <- rep("D", length=5) # specify to treat attributes as dummy variables
+prof.set <- Profiles(lvls=attrib, coding=dcode) # create the set of all possible profiles
+
+```
+
+### Creation of the optimal survey
+
+We generate a D-optimal design consisting of the best 10 choice sets, selected from the most informative profiles. The algorithm chooses the profiles that maximize the determinant of the Fisher Information Matrix, taking into account the simulated priors.
+
+```{r}
+optDes <- Modfed(cand.set=prof.set, n.sets=10, n.alts=3, par.draws=draws)
+```
+
+Decode the survey in a format we can read
+
+```{r}
+# Using the function Decode(), we can convert the choice set design from 
+# a model matrix structure to a data frame format 
+attrib <- list(spec = c("Assistente", "Codice", "Content"), #list of attributes with levels 
+               vel = c("Lento", "Veloce"),
+               qual = c("Sufficente", "Ottimale"),
+               priv = c("Bassa", "Alta"),
+               cost = c("15", "20", "25")) 
+
+
+optDesDF <- Decode(des=optDes$BestDesign$design, n.alts=3, lvl.names=attrib, coding=dcode)$design 
+names(optDesDF) <- c("spec", "vel", "qual", "priv", "cost")
+optDesDF
+
+```
+
+## Pre-processing
+
+Since we collected the responses using Google Forms, they need to be transformed into long format and then converted for analysis.
+
+```{r}
+# Script per convertire i dati dal Google Form al formato per Choice-Based Conjoint Analysis
+library(tidyverse)
+
+# Funzione per convertire i dati del questionario al formato choice-based
+convert_survey_to_choice_format <- function(input_file, output_file) {
+  
+  # Leggi il file CSV del questionario
+  survey_data <- read.csv(input_file, sep = ",", header = TRUE, check.names = FALSE)
+  
+  # Rimuovi le righe dove la risposta alla SCELTA 5 è "Codice - Lento - Sufficiente - Alta - 25€"
+  # La colonna SCELTA 5 è la nona colonna (indice 9)
+  choice5_col <- "Specializzazione | Velocità | Qualità | Privacy | Costo  (SCELTA 5)"
+  invalid_response <- "Codice - Lento - Sufficiente - Alta - 25€"
+  
+  rows_before <- nrow(survey_data)
+  survey_data <- survey_data[survey_data[[choice5_col]] != invalid_response, ]
+  rows_removed <- rows_before - nrow(survey_data)
+  
+  if (rows_removed > 0) {
+    cat("Rimosse", rows_removed, "righe con risposta non valida alla SCELTA 5\n")
+  }
+  
+  # Numero di choice set (colonne con le scelte - escludi le prime 4 colonne demografiche)
+  choice_columns <- 5:ncol(survey_data)
+  n_sets <- length(choice_columns)
+  
+  # Definizione del design (10 set, 3 alternative ciascuno)
+  design <- data.frame(
+    set = c(rep(1, 3), rep(2, 3), rep(3, 3), rep(4, 3), rep(5, 3), 
+            rep(6, 3), rep(7, 3), rep(8, 3), rep(9, 3), rep(10, 3)),
+    alt = rep(c("alt1", "alt2", "alt3"), 10),
+    spec = c("Assistente", "Codice", "Content",
+             "Content", "Assistente", "Codice",
+             "Codice", "Content", "Assistente",
+             "Assistente", "Codice", "Content",
+             "Codice", "Assistente", "Codice",
+             "Codice", "Content", "Assistente",
+             "Codice", "Assistente", "Content",
+             "Codice", "Content", "Assistente",
+             "Codice", "Assistente", "Content",
+             "Assistente", "Content", "Content"),
+    vel = c("Lento", "Lento", "Veloce",
+            "Veloce", "Veloce", "Lento",
+            "Lento", "Lento", "Veloce",
+            "Lento", "Veloce", "Veloce",
+            "Lento", "Lento", "Veloce",
+            "Lento", "Veloce", "Veloce",
+            "Lento", "Lento", "Veloce",
+            "Veloce", "Lento", "Veloce",
+            "Veloce", "Lento", "Lento",
+            "Veloce", "Lento", "Lento"),
+    qual = c("Ottimale", "Sufficente", "Ottimale",
+             "Ottimale", "Ottimale", "Sufficente",
+             "Sufficente", "Ottimale", "Sufficente",
+             "Sufficente", "Sufficente", "Ottimale",
+             "Sufficente", "Sufficente", "Ottimale",
+             "Ottimale", "Ottimale", "Sufficente",
+             "Ottimale", "Ottimale", "Sufficente",
+             "Ottimale", "Ottimale", "Sufficente",
+             "Sufficente", "Ottimale", "Sufficente",
+             "Sufficente", "Ottimale", "Sufficente"),
+    priv = c("Bassa", "Alta", "Bassa",
+             "Bassa", "Bassa", "Alta",
+             "Bassa", "Alta", "Alta",
+             "Alta", "Bassa", "Alta",
+             "Alta", "Bassa", "Alta",
+             "Bassa", "Bassa", "Alta",
+             "Bassa", "Alta", "Alta",
+             "Alta", "Alta", "Bassa",
+             "Bassa", "Bassa", "Alta",
+             "Bassa", "Bassa", "Alta"),
+    cost = c(25, 20, 15,
+             25, 20, 15,
+             20, 15, 25,
+             20, 15, 25,
+             25, 15, 20,
+             15, 20, 25,
+             25, 25, 20,
+             25, 20, 15,
+             25, 20, 15,
+             15, 20, 25)
+  )
+  
+  # Mappa per convertire le risposte del form alle alternative
+  create_choice_map <- function(spec, vel, qual, priv, cost) {
+    # Converti i nomi come appaiono nel form
+    spec_form <- ifelse(spec == "Content", "Prod. di contenuti", 
+                       ifelse(spec == "Assistente", "Assistente",
+                              ifelse(spec == "Codice", "Codice", spec)))
+    qual_form <- ifelse(qual == "Sufficente", "Sufficiente", qual)
+    
+    paste(spec_form, vel, qual_form, priv, paste0(cost, "€"), sep = " - ")
+  }
+  
+  # Crea una mappa per identificare le alternative
+  design$response_text <- create_choice_map(
+    design$spec, 
+    design$vel, 
+    design$qual, 
+    design$priv, 
+    design$cost
+  )
+  
+  # Inizializza il dataframe finale
+  choice_data <- data.frame()
+  
+  # Per ogni rispondente
+  for (resp_id in 1:nrow(survey_data)) {
+    
+    # Per ogni set di scelta
+    for (set_id in 1:n_sets) {
+      
+      # Estrai la risposta per questo set
+      response <- survey_data[resp_id, choice_columns[set_id]]
+      
+      # Trova le 3 alternative per questo set
+      set_alternatives <- design[design$set == set_id, ]
+      
+      # Per ogni alternativa nel set
+      for (alt_num in 1:3) {
+        alt_data <- set_alternatives[alt_num, ]
+        
+        # Determina se questa alternativa è stata scelta
+        # Normalizza la risposta per gestire variazioni di formato (spazi multipli, etc)
+        response_normalized <- gsub("\\s+", " ", trimws(as.character(response)))
+        alt_text_normalized <- gsub("\\s+", " ", trimws(alt_data$response_text))
+        
+        choice <- ifelse(response_normalized == alt_text_normalized, 1, 0)
+        
+        # Crea la riga per questo record
+        row_data <- data.frame(
+          resp.id = resp_id,
+          ques = set_id,
+          alt = alt_data$alt,
+          spec = alt_data$spec,
+          vel = alt_data$vel,
+          qual = alt_data$qual,
+          priv = alt_data$priv,
+          cost = alt_data$cost,
+          choice = choice
+        )
+        
+        choice_data <- rbind(choice_data, row_data)
+      }
+    }
+  }
+  
+  
+  # Scrivi il file di output
+  write.csv2(choice_data, output_file, row.names = FALSE, quote = FALSE)
+  
+  # Statistiche per il log
+  cat("Conversione completata!\n")
+  cat("Numero di rispondenti:", nrow(survey_data), "\n")
+  cat("Numero di set di scelta:", n_sets, "\n")
+  cat("Numero totale di osservazioni:", nrow(choice_data), "\n")
+  
+  # Verifica delle scelte per rispondente
+  choices_per_resp <- choice_data %>%
+    filter(choice == 1) %>%
+    group_by(resp.id) %>%
+    summarise(n_choices = n())
+  
+  cat("\nRiepilogo scelte per rispondente:\n")
+  print(summary(choices_per_resp$n_choices))
+  
+  return(choice_data)
+}
+
+# Esegui la conversione
+# input_file da sovrascrivere con il file scaricato dal google form
+# output_file è il file di destinazione (viene sovrascrtitto ogni volta)
+choice_data <- convert_survey_to_choice_format(
+  input_file = "raw_data/Questionario Lab (Risposte) - Risposte del modulo 1.csv", 
+  output_file = "data/Choice_Data_Converted.csv"
+)
+
+# Visualizza le prime righe
+head(choice_data, 30)
+
+# Controllo con barplot dei rispondenti per vedere che non ci siano bug nella conversione 
+barplot(table(choice_data$resp.id), 
+        main = "Frequenza per Respondent", 
+        xlab = "resp.id", 
+        ylab = "Frequenza",
+        las = 2)
+
+```
+
+## Analysis
+
+```{r}
+choice_data <- read.csv("data/Choice_Data_Converted.csv", sep=";")
+head(choice_data)
+```
+
+Perform a descriptive analysis
+
+```{r}
+summary(choice_data)
+xtabs(choice ~ spec, data=choice_data)
+xtabs(choice ~ vel, data=choice_data)
+xtabs(choice ~ qual, data=choice_data)
+xtabs(choice ~ priv, data=choice_data)
+xtabs(choice ~ cost, data=choice_data)
+```
+
+Some values are not properly coded, so we recode them as follows:
+
+-   Spec: as a categorical variable
+
+-   vel: categorical
+
+-   qual: categorical
+
+-   priv: categorical
+
+-   cost: qualitative
+
+```{r}
+choice_data$spec <- factor(choice_data$spec, levels=c("Assistente","Codice","Content")) # change order of categories
+choice_data$vel <- factor(choice_data$vel, levels=c("Lento","Veloce")) # change order of categories
+choice_data$qual <- factor(choice_data$qual, levels=c("Sufficente","Ottimale")) # change order of categories
+choice_data$priv <- factor(choice_data$priv, levels=c("Bassa","Alta")) # change order of categories
+choice_data$cost <- as.factor(choice_data$cost) # convert the variable as qualitative
+
+```
+
+### Multinomial logit regression
+
+A suitable approach to model this type of data, where the dependent variable has more than two levels, is the **Multinomial Logit Model**. The coefficients estimated by the model represent the **part-worth utilities** of each attribute level and are useful for assessing the relative importance of product features, calculating consumers’ **willingness to pay**, and simulating preference shares.
+
+We fit a choice model with "mlogit" function, `mlogit` requires the choice data to be in a specific format, which can be created using the `dfidx()` function. You pass your choice data to `dfidx()` along with a few parameters that indicate how the data is organized. The function can handle data in either **long** or **wide** format, and you specify the format using the `shape` parameter.
+
+```{r}
+library(dfidx)
+library(mlogit)
+
+# 1) Create ID
+choice_data$choice_id <- with(choice_data, paste(resp.id, ques, sep = "_"))
+
+# 2) dfix for choice_data
+choice_data.mlogit <- dfidx(
+  choice_data,
+  idx    = list(c("choice_id", "resp.id"), "alt"),
+  choice = "choice",
+  shape  = "long"
+)
+```
+
+The resulting `choice_data.mlogit` is a `dfidx` class object that can be used to estimate a model with `mlogit()`. The syntax for `mlogit()` uses formula notation, similar to other regression functions in R. However, it requires the use of the `|` symbol to separate alternative-specific variables from non-alternative-specific variables.
+
+First of all we estimate the MNL model with the intercept and all the variables. In this model, the intercept captures the general propensity to choose a particular alternative relative to a reference.
+
+```{r}
+m1 <- mlogit(choice ~ spec + vel + qual + priv + cost, data = choice_data.mlogit)
+summary(m1)
+```
+
+Secondly we are assuming the same model but without the intercept. This allows to visualize the absolute effect without the influence of a general tendency.
+
+```{r}
+m2 <- mlogit(choice ~ spec + vel + qual + priv + cost | -1, data = choice_data.mlogit)
+summary(m2)
+```
+
+Then using a Likelihood Ratio Test (LR Test), we verify if the “no intercept” restriction significantly worsens the model. If the test is not significant, it means that the model without intercepts (m2) is fine.
+
+```{r}
+lrtest(m2, m1)
+```
+
+The difference between the two models is not statistically significant, meaning that including the intercept does not improve the model. Therefore, we can choose Model 2 (m2), as it explains the phenomenon without adding unnecessary complexity.
+
+Then we fit the model without intercept parameters and with price as a quantitative variable:
+
+```{r}
+m3 <- mlogit(choice ~ spec + vel + qual + priv
+             + as.numeric(as.character(cost)) | -1, data = choice_data.mlogit)
+summary(m3)
+```
+
+```{r}
+lrtest(m3, m2)
+```
+
+In this case, the likelihood ratio test shows that the difference between the two models is not statistically significant (p = 0.489). This means that treating cost as a numeric variable does not significantly improve the model compared to treating it as a categorical variable. Therefore, either specification could be used, but using the simpler numeric representation of cost may be preferable for interpretability and calculating metrics like willingness to pay.
+
+### Assess the role of product attributes
+
+To make informed decisions about the features that are most valuable for a future product, it is essential to assess the role of each product attribute.
+
+In this case we compute the:
+
+-   Willingness-to-pay
+
+-   Simulate preference shares
+
+#### Willingness to pay
+
+With the Willingness to pay we are assessing the monetary value that people would pay for each attribute using the result from the MML.
+
+$$
+WTP_{elec} = -\frac{\beta_{elec}}{\beta_{price}}
+$$
+
+```{r}
+library(car)
+
+#attribute
+attributes <- c("privAlta", "specCodice", "specContent", "velVeloce", "qualOttimale")
+
+# Coefficient
+beta_cost <- coef(m3)["as.numeric(as.character(cost))"]
+
+wtp_point <- sapply(attributes, function(att) {
+  -coef(m3)[att] / beta_cost
+})
+
+
+wtp_table <- data.frame() 
+
+for(attr in attributes) {
+  
+  formula_str <- paste0("-", attr, " / `as.numeric(as.character(cost))`")
+  
+  # delta method
+  dm <- deltaMethod(m3, formula_str)
+  
+  # table scheme
+  wtp_table <- rbind(wtp_table, data.frame(
+    Attribute = attr,
+    WTP = round(dm$Estimate, 2),
+    SE = round(dm$SE, 2),
+    CI_Lower = round(dm$`2.5 %`, 2),
+    CI_Upper = round(dm$`97.5 %`, 2)
+  ))
+}
+
+print(wtp_table)
+```
+
+As we can see from the output the higher WTP would be in privacy and quality.
+
+#### Simulate preference shares
+
+We can use the model to simulate the preferences share we will be able to know the probability that a consumer would choose a product instead of another.
+
+```{r}
+# Simulate preference shares using the "predict.mnl" function
+# Define the function
+predict.mnl <- function(model, data) {
+  # Function for predicting preference shares from a MNL model
+  # model: mlogit object returned by mlogit()
+  # data: a data frame containing the set of designs for which you want to
+  # predict shares.  Same format at the data used to estimate model.
+  data.model <- model.matrix(update(model$formula, 0 ~ .), data = data)[,-1]
+  logitUtility <- data.model%*%model$coef
+  share <- exp(logitUtility)/sum(exp(logitUtility))
+  cbind(share, data)
+}
+```
+
+To use `predict.mnl`, you first need to create a data frame that contains the set of product designs for which you want to predict preference shares. One way to do this is to generate the full set of possible designs using `expand.grid()`, and then select the specific designs of interest by their row numbers.
+
+```{r}
+attributes <- list(spec=names(table(choice_data.mlogit$spec)),
+               vel=names(table(choice_data.mlogit$vel)),
+               qual=names(table(choice_data.mlogit$qual)),
+               priv=names(table(choice_data.mlogit$priv)),
+               cost=names(table(choice_data.mlogit$cost)))
+
+allDesign <- expand.grid(attributes)
+allDesign #all possible design
+
+```
+
+To test our hypotesis we extrapolate some design that could fit
+
+| Design | Specification | Velocity | Quality    | Privacy | Cost |
+|--------|---------------|----------|------------|---------|------|
+| 2      | Codice        | Lento    | Sufficente | Bassa   | 15   |
+| 32     | Codice        | Lento    | Ottimale   | Bassa   | 20   |
+| 28     | Assistente    | Veloce   | Sufficente | Bassa   | 20   |
+| 67     | Assistente    | Lento    | Ottimale   | Alta    | 25   |
+| 6      | Content       | Veloce   | Sufficente | Bassa   | 15   |
+| 69     | Content       | Lento    | Ottimale   | Alta    | 25   |
+
+```{r}
+new.data <- allDesign[c(2, 32, 28, 67, 6, 69), ]
+new.data
+
+predict.mnl(m3, new.data)
+```
+
+To understand which attributes most influence consumer preferences, we use a sensitivity chart. By keeping the set of competing products fixed, we can isolate and observe the effect of changing only our product. Sensitivity analysis thus helps translate model predictions into actionable insights for product design.
+
+```{r, fig.width=12, fig.height=10}
+sensitivity.mnl <- function(model, attrib, base.data, competitor.data) {
+  # Function for creating data for a preference share-sensitivity chart
+  # model: mlogit object returned by mlogit() function
+  # attrib: list of vectors with attribute levels to be used in sensitivity
+  # base.data: data frame containing baseline design of target product
+  # competitor.data: data frame contining design of competitive set
+  data <- rbind(base.data, competitor.data)
+  base.share <- predict.mnl(model, data)[1,1]
+  share <- NULL
+  for (a in seq_along(attrib)) {
+    for (i in attrib[[a]]) {
+      data[1,] <- base.data
+      data[1,a] <- i
+      share <- c(share, predict.mnl(model, data)[1,1])
+    }
+  }
+  data.frame(level=unlist(attrib), share=share, increase=share-base.share)
+}
+base.data <- new.data[1,]
+competitor.data <- new.data[-1,]
+(tradeoff <- sensitivity.mnl(m2, attributes, base.data, competitor.data))
+
+barplot(tradeoff$increase, horiz=FALSE, names.arg=tradeoff$level,
+        ylab="Change in Share for the Planned Product Design",
+        ylim=c(-0.1,0.11))
+grid(nx=NA, ny=NULL)
+
+# Colored barplot for our future implementation
+cols <- rep("gray", length(tradeoff$level))
+
+cols[tradeoff$level == "Alta"] <- "red"
+
+barplot(tradeoff$increase,
+        horiz = FALSE,
+        names.arg = tradeoff$level,
+        ylab = "Change in Share for the Planned Product Design",
+        ylim = c(-0.1, 0.11),
+        col = cols)
+grid(nx = NA, ny = NULL)
+
+```
+
+According to the result we check other choice
+
+```{r}
+new.data_new <- allDesign[c(14, 32, 28, 67, 6, 69), ]
+new.data_new
+
+predict.mnl(m3, new.data_new)
+```
+
+### Controlling for consumer heterogeneity
+
+To control for consumer heterogeneity, we fit a mixed multinomial logit (MNL) model. In statistical terms, coefficients that vary across respondents (or customers) are referred to as random coefficients or random effects. To estimate a multinomial logit model with random coefficients using `mlogit`, we define a vector specifying which coefficients should vary across respondents. This vector is a character vector of the same length as the coefficient vector, where each entry indicates the assumed distribution of the corresponding random coefficient across respondents: `"n"` for normal, `"l"` for log-normal, `"t"` for truncated normal, and `"u"` for uniform. In this analysis, we assume that all coefficients are normally distributed across the population, and this specification is stored in a vector called `m2.rpar`.
+
+```{r}
+m2.rpar <- rep("n", length=length(m2$coef))
+names(m2.rpar) <- names(m2$coef)
+m2.rpar
+```
+
+We provide this vector to `mlogit` using the `rpar` parameter, which stands for “random parameters.” Additionally, we specify that there are multiple choice observations per respondent by setting `panel = TRUE`. We also indicate whether the random parameters should be allowed to correlate with one another. For this initial estimation, we assume that the random parameters are uncorrelated (`correlation = FALSE`), a choice that we will revisit later.
+
+```{r, fig.width=12, fig.height=10}
+m2.mixed <- mlogit(choice ~ spec + vel + qual + priv + cost | -1,
+                  data = choice_data.mlogit,
+                  panel=TRUE, rpar = m2.rpar, correlation = FALSE)
+summary(m2.mixed)
+
+# We can get a visual summary of the distribution of random effects and hence of the level of heterogeneity
+plot(m2.mixed)
+```
+
+We can extract the distribution of specific random effects using the function rpar()
+
+```{r, fig.width=12, fig.height=10}
+specCodice.distr <- rpar(m2.mixed, "specCodice")
+summary(specCodice.distr)
+mean(specCodice.distr)
+med(specCodice.distr)
+plot(specCodice.distr)
+```
+
+We can add that the random coefficients can be correlated. Random coefficients capture heterogeneity across respondents, (how preferences differ between individuals).
+
+```{r}
+m2.mixed2 <- update(m2.mixed, correlation = TRUE)
+summary(m2.mixed2)
+```
+
+To get a better sense of the strength of the association among random coefficients, we can extract the covariance matrix using "cov.mlogit" and then convert it to a correlation matrix using "cov2cor" from base R.
+
+```{r, fig.width=12, fig.height=10}
+cov2cor(cov.mlogit(m2.mixed2))
+
+# Calculate correlation matrix
+cor_mat <- cov2cor(cov.mlogit(m2.mixed2))
+library(ggplot2)
+library(reshape2)
+
+cor_mat <- cov2cor(cov.mlogit(m2.mixed2))
+
+cor_long <- melt(cor_mat)
+ggplot(cor_long, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                       midpoint = 0, limit = c(-1, 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "", fill = "Correlation")
+
+```
+
+```{r}
+# We can also obtain the standard errors of the correlations among random effects,
+# and hence perform significance test
+summary(vcov(m2.mixed2, what = "rpar", type = "cor"))
+
+# We may restrict the correlation to only random parameters with significant association
+m2.mixed3 <- update(m2.mixed2, correlation = c("specCodice", "specContent", "privAlta", "velVeloce", "cost20", "cost25"))
+
+# The significant presence of random coefficients and their correlation
+# can be further investigated using the ML tests, such as the ML ratio test
+lrtest(m2, m2.mixed) #Fixed effects vs. uncorrelated random effects
+lrtest(m2.mixed, m2.mixed2) #Uncorrelated random effects vs. all correlated random effects
+lrtest(m2.mixed3, m2.mixed2) #Partially correlated random effects vs. all correlated random effects
+```
+
+As we can see the m2.mixed2 is the best model
+
+#### Simulate preferences share
+
+To generate share predictions with a mixed multinomial logit model, we use the `predict.mixed.mnl` function. This function operates similarly to `predict.mnl`, but with one important difference: instead of using a single set of coefficients, it simulates the preferences of *nresp* representative respondents.
+
+For each of these simulated respondents, the part-worth utilities are drawn from a multivariate normal distribution whose mean vector corresponds to the estimated coefficient means (μ) and whose covariance matrix corresponds to the estimated covariance of the random coefficients (Σ). The sampling is performed using:
+
+> **draws ← mvrnorm(n = nresp, μ = coef.mu, Σ = coef.Sigma)**
+
+For each simulated respondent, we compute utilities and choice probabilities in the same way as in the standard `predict.mnl` function. After obtaining the predicted preference shares for all simulated respondents, we average these shares across individuals to obtain the final overall share predictions
+
+```{r}
+library(MASS)
+predict.mixed.mnl <- function(model, data, nresp=1000) {
+  # Function for predicting shares from a mixed MNL model
+  # model: mlogit object returned by mlogit()
+  # data: a data frame containing the set of designs for which you want to
+  #       predict shares. Same format at the data used to estimate model.
+  # Note that this code assumes all model parameters are random
+  data.model <- model.matrix(update(model$formula, 0 ~ .), data = data)[,-1]
+  coef.Sigma <- cov.mlogit(model)
+  coef.mu <- model$coef[1:dim(coef.Sigma)[1]]
+  draws <- mvrnorm(n=nresp, coef.mu, coef.Sigma)
+  shares <- matrix(NA, nrow=nresp, ncol=nrow(data))
+  for (i in 1:nresp) {
+    utility <- data.model%*%draws[i,]
+    share = exp(utility)/sum(exp(utility))
+    shares[i,] <- share
+  }
+  cbind(colMeans(shares), data)
+}
+
+set.seed(1111)
+predict.mixed.mnl(m2.mixed2, data=new.data)
+predict.mixed.mnl(m2.mixed2, data=new.data_new) # prediciton with our new product 
+```
+
+### Demographic Analysis
+
+```{r}
+# Extract demographic information per respondent
+# This script extracts age, gender, and education level for each respondent
+library(tidyverse)
+
+# Read the survey data
+survey_data <- read.csv("raw_data/Questionario Lab (Risposte) - Risposte del modulo 1.csv", 
+                        stringsAsFactors = FALSE,
+                        fileEncoding = "UTF-8")
+
+# Rimuovi le righe dove la risposta alla SCELTA 5 è "Codice - Lento - Sufficiente - Alta - 25€"
+choice5_col <- "Specializzazione...Velocità...Qualità...Privacy...Costo...SCELTA.5."
+invalid_response <- "Codice - Lento - Sufficiente - Alta - 25€"
+
+# Usa grepl per un matching più robusto
+rows_to_keep <- !grepl(invalid_response, survey_data[[choice5_col]], fixed = TRUE)
+rows_before <- nrow(survey_data)
+survey_data <- survey_data[rows_to_keep, ]
+rows_removed <- rows_before - nrow(survey_data)
+
+if (rows_removed > 0) {
+  cat("Rimosse", rows_removed, "righe con risposta non valida alla SCELTA 5\n")
+}
+
+# Extract demographic columns
+demographic_info <- survey_data %>%
+  select(
+    Timestamp = 1,  # First column is timestamp
+    Age = 2,        # "A quale fascia d'età appartieni?"
+    Gender = 3,     # "Con quale genere ti identifichi?"
+    Education = 4   # "Qual è il tuo titolo di studio (o che stai conseguendo)?"
+  ) %>%
+  mutate(
+    Respondent_ID = row_number()
+  ) %>%
+  select(Respondent_ID, Timestamp, Age, Gender, Education)
+
+# Rename columns to English for clarity
+colnames(demographic_info) <- c(
+  "Respondent_ID",
+  "Timestamp",
+  "Age_Group",
+  "Gender",
+  "Education_Level"
+)
+
+# Display summary
+cat("Total respondents:", nrow(demographic_info), "\n\n")
+
+# Preview the data
+print(head(demographic_info, 10))
+
+# Save to CSV file
+write.csv(demographic_info, 
+          "data/demographic_information.csv", 
+          row.names = FALSE,
+          fileEncoding = "UTF-8")
+
+```
+
+```{r}
+demographic_data <- read.csv("data/demographic_information.csv", sep = ",") # Assuming comma as separator for this file
+head(demographic_data)
+summary(demographic_data)
+
+# Check column names in demographic_data and choice_data
+print(names(choice_data))
+print(names(demographic_data))
+```
+
+```{r}
+choice_data_with_demographics <- merge(choice_data, demographic_data, by.x = "resp.id", by.y = "Respondent_ID", all.x = TRUE)
+
+head(choice_data_with_demographics)
+summary(choice_data_with_demographics)
+
+```
+
+```{r}
+PW.ind <- fitted(m2.mixed2, type = "parameters")
+head(PW.ind) # part worth per person
+```
+
+```{r}
+names(PW.ind)[names(PW.ind) == "id"] <- "resp.id"
+PW.ind_with_demographics <- merge(PW.ind, demographic_data, by.x = "resp.id", by.y = "Respondent_ID", all.x = TRUE)
+head(PW.ind_with_demographics)
+```
+
+```{r}
+library(lattice)
+
+histogram(~ privAlta | Age_Group, data = PW.ind_with_demographics,
+          main = "Histogram of privAlta Part-Worth by Age Group",
+          xlab = "privAlta Part-Worth", ylab = "Density")
+
+histogram(~ privAlta | Education_Level, data = PW.ind_with_demographics,
+          main = "Histogram of privAlta Part-Worth by Education_Level",
+          xlab = "privAlta Part-Worth", ylab = "Density")
+
+histogram(~ privAlta | Gender, data = PW.ind_with_demographics,
+          main = "Histogram of privAlta Part-Worth by Gender",
+          xlab = "privAlta Part-Worth", ylab = "Density")
+
+histogram(~ specCodice | Education_Level, data = PW.ind_with_demographics,
+          main = "Histogram of specCodice Part-Worth by Education_Level",
+          xlab = "specCodice Part-Worth", ylab = "Density")
+
+histogram(~ cost20 | Age_Group, data = PW.ind_with_demographics,
+          main = "Histogram of cost20 Part-Worth by Age_group",
+          xlab = "cost20 Part-Worth", ylab = "Density")
+
+histogram(~ cost25 | Age_Group, data = PW.ind_with_demographics,
+          main = "Histogram of cost25 Part-Worth by Age_group",
+          xlab = "cost25 Part-Worth", ylab = "Density")
+
+################################################################
+################################################################
+
+boxplot(privAlta ~ Age_Group, data = PW.ind_with_demographics,
+        main = "Boxplot of privAlta Part-Worth by Age Group",
+        xlab = "Age Group", ylab = "velVeloce Part-Worth")
+
+boxplot(privAlta ~ Education_Level, data = PW.ind_with_demographics,
+        main = "Boxplot of privAlta Part-Worth by Education_Level",
+        xlab = "Education_Level", ylab = "privAlta Part-Worth")
+
+boxplot(privAlta ~ Gender, data = PW.ind_with_demographics,
+        main = "Boxplot of privAlta Part-Worth by Gender",
+        xlab = "Gender", ylab = "privAlta Part-Worth")
+
+boxplot(specCodice ~ Education_Level, data = PW.ind_with_demographics,
+        main = "Boxplot of specCodice Part-Worth by Education_Level",
+        xlab = "Education_Level", ylab = "specCodice Part-Worth")
+
+boxplot(cost20 ~ Age_Group, data = PW.ind_with_demographics,
+        main = "Boxplot of cost20 Part-Worth by Age_group",
+        xlab = "Age_group", ylab = "cost20 Part-Worth")
+
+```
+
+```{r}
+# Perform statistical tests to assess the impact of 'Age_Group' on 'velVeloce' preferences. 
+# Since 'Age_Group' has multiple categories, an ANOVA (Analysis of Variance) test is appropriate to determine if there are significant differences in the mean 'velVeloce' part-worth across the age groups.
+anova_result <- aov(velVeloce ~ Age_Group, data = PW.ind_with_demographics)
+summary(anova_result)
+
+################################################################
+################################################################
+
+histogram(~ velVeloce | Gender, data = PW.ind_with_demographics,
+          main = "Histogram of velVeloce Part-Worth by Gender",
+          xlab = "velVeloce Part-Worth", ylab = "Density")
+
+################################################################
+################################################################
+
+boxplot(velVeloce ~ Gender, data = PW.ind_with_demographics,
+        main = "Boxplot of velVeloce Part-Worth by Gender",
+        xlab = "Gender", ylab = "velVeloce Part-Worth")
+
+################################################################
+################################################################
+
+by(PW.ind_with_demographics$velVeloce, PW.ind_with_demographics$Gender, mean)
+
+################################################################
+################################################################
+
+anova_gender_result <- aov(velVeloce ~ Gender, data = PW.ind_with_demographics)
+summary(anova_gender_result)
+
+################################################################
+################################################################
+
+# Define the variables of interest with default values
+part_worth_variable <- "velVeloce"
+demographic_variable <- "Age_Group"
+
+# Ensure the necessary library for plotting is loaded
+library(lattice)
+
+# 1. Generate a histogram of part_worth_variable by demographic_variable
+histogram(as.formula(paste("~ ", part_worth_variable, " | ", demographic_variable)),
+          data = PW.ind_with_demographics,
+          main = paste("Histogram of", part_worth_variable, "by", demographic_variable),
+          xlab = paste(part_worth_variable, "Part-Worth"), ylab = "Density")
+
+# 2. Generate a boxplot of part_worth_variable by demographic_variable
+boxplot(as.formula(paste(part_worth_variable, "~ ", demographic_variable)),
+        data = PW.ind_with_demographics,
+        main = paste("Boxplot of", part_worth_variable, "by", demographic_variable),
+        xlab = demographic_variable, ylab = paste(part_worth_variable, "Part-Worth"))
+
+# 3. Calculate the mean part_worth_variable for each category of demographic_variable
+cat(paste("\nMean", part_worth_variable, "by", demographic_variable, ":\n"))
+print(by(PW.ind_with_demographics[[part_worth_variable]],
+         PW.ind_with_demographics[[demographic_variable]],
+         mean))
+
+# 4. Perform an appropriate statistical test
+num_categories <- length(unique(PW.ind_with_demographics[[demographic_variable]]))
+
+if (num_categories > 2) {
+  # Perform ANOVA test if more than two unique categories
+  cat(paste("\nPerforming ANOVA test for", part_worth_variable, "by", demographic_variable, ":\n"))
+  anova_result <- aov(as.formula(paste(part_worth_variable, "~ ", demographic_variable)),
+                      data = PW.ind_with_demographics)
+  print(summary(anova_result))
+} else if (num_categories == 2) {
+  # Perform t-test if exactly two unique categories
+  cat(paste("\nPerforming t-test for", part_worth_variable, "by", demographic_variable, ":\n"))
+  t_test_result <- t.test(as.formula(paste(part_worth_variable, "~ ", demographic_variable)),
+                          data = PW.ind_with_demographics)
+  print(t_test_result)
+} else {
+  cat("\nNot enough categories in the demographic variable to perform a statistical test.\n")
+}
+
+```
