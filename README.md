@@ -1,48 +1,48 @@
 # Application of Choice-Based Conjoint Analysis
 
-Questo repository contiene l'implementazione di un'analisi Choice-Based Conjoint per studiare le preferenze degli utenti riguardo alle funzionalità di assistenti AI (es. ChatGPT).
+This repository contains the implementation of a Choice-Based Conjoint Analysis to study user preferences regarding AI assistant features (e.g., ChatGPT).
 
-## Descrizione del Progetto
+## Project Description
 
-Il progetto utilizza la metodologia Choice-Based Conjoint Analysis per analizzare le preferenze degli utenti su cinque attributi principali di un assistente AI:
+The project uses the Choice-Based Conjoint Analysis methodology to analyze user preferences across five main attributes of an AI assistant:
 
-| Attributo | Livelli |
-|-----------|---------|
-| **Specializzazione** | Assistente, Codice, Content |
-| **Velocità** | Lento, Veloce |
-| **Qualità** | Sufficiente, Ottimale |
-| **Privacy** | Bassa, Alta |
-| **Costo** | 15€, 20€, 25€ |
+| Attribute | Levels |
+|-----------|--------|
+| **Specialization** | Assistant, Code, Content |
+| **Speed** | Slow, Fast |
+| **Quality** | Sufficient, Optimal |
+| **Privacy** | Low, High |
+| **Cost** | 15€, 20€, 25€ |
 
-## Struttura del Repository
+## Repository Structure
 
 ```
-├── Analisi.R                           # Script principale per l'analisi
-├── Design_Project.R                    # Generazione del design sperimentale
-├── Convert_survey_to_choice_format.R   # Conversione dati Google Form
-├── Extract_info_per_respondent.R       # Estrazione info demografiche
+├── Analisi.R                           # Main analysis script
+├── Design_Project.R                    # Experimental design generation
+├── Convert_survey_to_choice_format.R   # Google Form data conversion
+├── Extract_info_per_respondent.R       # Demographic info extraction
 ├── data/
-│   ├── Choice_Data_Converted.csv       # Dati convertiti per l'analisi
-│   └── demographic_information.csv     # Info demografiche rispondenti
+│   ├── Choice_Data_Converted.csv       # Converted data for analysis
+│   └── demographic_information.csv     # Respondent demographic info
 └── raw_data/
-    └── Questionario Lab (Risposte).csv # Risposte grezze dal Google Form
+    └── Questionario Lab (Risposte).csv # Raw responses from Google Form
 ```
 
-### Script R
+### R Scripts
 
-| Script | Descrizione |
+| Script | Description |
 |--------|-------------|
-| `Analisi.R` | Script principale per l'analisi dei dati con modelli Multinomial Logit e Mixed Multinomial Logit |
-| `Design_Project.R` | Generazione del design sperimentale ottimale |
-| `Convert_survey_to_choice_format.R` | Conversione dei dati dal Google Form al formato per l'analisi |
-| `Extract_info_per_respondent.R` | Estrazione delle informazioni demografiche dei rispondenti |
+| `Analisi.R` | Main data analysis script using Multinomial Logit and Mixed Multinomial Logit models |
+| `Design_Project.R` | Optimal experimental design generation |
+| `Convert_survey_to_choice_format.R` | Conversion of Google Form data into the format required for analysis |
+| `Extract_info_per_respondent.R` | Extraction of respondent demographic information |
 
-### Dati
+### Data
 
-- **`raw_data/`**: Dati grezzi raccolti dal Google Form
-- **`data/`**: Dati elaborati pronti per l'analisi
-  - `Choice_Data_Converted.csv`: Risposte convertite nel formato richiesto per la Conjoint Analysis
-  - `demographic_information.csv`: Informazioni demografiche (età, genere, titolo di studio)
+- **`raw_data/`**: Raw data collected from the Google Form
+- **`data/`**: Processed data ready for analysis
+  - `Choice_Data_Converted.csv`: Responses converted into the format required for Conjoint Analysis
+  - `demographic_information.csv`: Demographic information (age, gender, education level)
 
 ## Contributors
 
